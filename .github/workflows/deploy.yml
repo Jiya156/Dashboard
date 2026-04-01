@@ -1,0 +1,115 @@
+name: Deploy MERN Dashboard to Azure VM
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      # ─────────────────────────────────────
+      # 1. Checkout code
+      # ─────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ─────────────────────────────────────
+      # 2. Setup Node.js
+      # ─────────────────────────────────────
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            client/package-lock.json
+            server/package-lock.json
+
+      # ─────────────────────────────────────
+      # 3. Install & build frontend
+      # ─────────────────────────────────────
+      - name: Install frontend dependencies
+        working-directory: ./client
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: ./client
+        env:
+          VITE_APP_BASE_URL: http://${{ secrets.VM_HOST }}:8080
+        run: npm run build
+
+      # ─────────────────────────────────────
+      # 4. Install backend dependencies
+      # ─────────────────────────────────────
+      - name: Install backend dependencies
+        working-directory: ./server
+        run: npm ci
+
+      # ─────────────────────────────────────
+      # 5. Deploy to Azure VM via SSH
+      # ─────────────────────────────────────
+      - name: Deploy to Azure VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            set -e
+
+            echo "──────────────────────────────"
+            echo "  Starting deployment..."
+            echo "──────────────────────────────"
+
+            cd /home/azureuser/Dashboard
+
+            # Pull latest code
+            echo "→ Pulling latest code..."
+            git pull origin main
+
+            # ── Backend ──
+            echo "→ Installing backend dependencies..."
+            cd /home/azureuser/Dashboard/server
+            npm ci
+
+            # Ensure .env exists (first deploy only)
+            if [ ! -f .env ]; then
+              echo "→ Creating server .env..."
+              echo "MONGO_URL=${{ secrets.MONGO_URL }}" > .env
+              echo "PORT=5001" >> .env
+            fi
+
+            # ── Frontend ──
+            echo "→ Installing frontend dependencies..."
+            cd /home/azureuser/Dashboard/client
+            npm ci
+
+            # Ensure .env exists
+            if [ ! -f .env ]; then
+              echo "→ Creating client .env..."
+              echo "VITE_APP_BASE_URL=http://${{ secrets.VM_HOST }}:8080" > .env
+            fi
+
+            # Build frontend
+            echo "→ Building frontend..."
+            npm run build
+
+            # ── Restart backend ──
+            echo "→ Restarting backend with PM2..."
+            pm2 restart dashboard-backend || pm2 start /home/azureuser/Dashboard/server/app.js --name "dashboard-backend"
+            pm2 save
+
+            # ── Reload Nginx ──
+            echo "→ Reloading Nginx..."
+            sudo systemctl reload nginx
+
+            echo "──────────────────────────────"
+            echo "  Deployment complete! ✅"
+            echo "──────────────────────────────"
+            echo "  Frontend: http://${{ secrets.VM_HOST }}"
+            echo "  Backend:  http://${{ secrets.VM_HOST }}:8080"
+            echo "──────────────────────────────"
