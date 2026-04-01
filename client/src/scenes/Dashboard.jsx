@@ -77,6 +77,26 @@ function Dashboard() {
       <FlexBetween>
         <Header title="DASHBOARD" subtitle="Welcome to your dashboard" />
 
+        {/* DEPLOYMENT BANNER - CI/CD Test */}
+        <Box
+          sx={{
+            background: "linear-gradient(90deg, #6a11cb 0%, #2575fc 100%)",
+            borderRadius: "12px",
+            padding: "12px 20px",
+            marginBottom: "20px",
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+          }}
+        >
+          <Typography variant="h5" sx={{ color: "#fff", fontWeight: "bold" }}>
+            🚀 Deployed via GitHub Actions CI/CD on Azure VM
+          </Typography>
+          <Typography variant="body2" sx={{ color: "#ddd", marginLeft: "auto" }}>
+            v2.0 — Live
+          </Typography>
+        </Box>
+
         <Box>
           <Button
             sx={{

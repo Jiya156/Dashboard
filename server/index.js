@@ -40,6 +40,15 @@ app.use("/client", clientRoutes);
 app.use("/management", managementRoutes);
 app.use("/sales", salesRoutes);
 
+app.get("/health", (req, res) => {
+  res.json({
+    status: "✅ Server is running",
+    version: "2.0",
+    timestamp: new Date().toISOString(),
+    message: "Dashboard API is live on Azure VM!"
+  });
+});
+
 // MONGOOSE SETUP
 const PORT = process.env.PORT || 9000;
 mongoose
